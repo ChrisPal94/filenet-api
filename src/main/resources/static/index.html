@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Conexión a FileNet</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="bg-light">
+    <div class="container mt-5">
+      <h1 class="text-center mb-4">Probar conexión a FileNet</h1>
+      <div class="text-center">
+        <button id="btnConnect" class="btn btn-primary me-2">Conectar</button>
+        <button id="btnCount" class="btn btn-success me-2">
+          Contar Documentos
+        </button>
+        <button id="btnList" class="btn btn-info me-2">Listar Carpetas</button>
+      </div>
+      <div class="mt-4 text-center" id="responseArea"></div>
+    </div>
+
+    <script>
+      document
+        .getElementById('btnConnect')
+        .addEventListener('click', function () {
+          fetch('/api/conectar')
+            .then((response) => response.text())
+            .then((data) => {
+              document.getElementById(
+                'responseArea'
+              ).innerHTML = `<div class="alert alert-info">${data}</div>`
+            })
+            .catch((error) => {
+              document.getElementById(
+                'responseArea'
+              ).innerHTML = `<div class="alert alert-danger">Error: ${error}</div>`
+            })
+        })
+
+      document
+        .getElementById('btnCount')
+        .addEventListener('click', function () {
+          fetch('/api/documentos/total')
+            .then((response) => response.text())
+            .then((data) => {
+              document.getElementById(
+                'responseArea'
+              ).innerHTML = `<div class="alert alert-info">${data}</div>`
+            })
+            .catch((error) => {
+              document.getElementById(
+                'responseArea'
+              ).innerHTML = `<div class="alert alert-danger">Error: ${error}</div>`
+            })
+        })
+
+      document.getElementById('btnList').addEventListener('click', function () {
+        fetch('/api/carpetas/total')
+          .then((response) => response.json())
+          .then((data) => {
+            let html = '<ul class="list-group">'
+
+            data.carpetas.forEach((folder) => {
+              const nombre = folder.nombre || 'raiz'
+              const ruta = folder.ruta || ''
+              const id = folder.id || ''
+              const path = folder.path || ''
+
+              html += `
+          <li class="list-group-item">
+            <strong>${nombre}</strong><br>
+            <small class="text-muted">Ruta: ${ruta}</small><br>
+            <small class="text-muted">Path: ${path}</small><br>
+            <small class="text-muted">ID: ${id}</small>
+          </li>`
+            })
+
+            html += '</ul>'
+            document.getElementById('responseArea').innerHTML = html
+          })
+          .catch((error) => {
+            document.getElementById('responseArea').innerHTML = `
+        <div class="alert alert-danger">Error: ${error}</div>`
+          })
+      })
+    </script>
+  </body>
+</html>
