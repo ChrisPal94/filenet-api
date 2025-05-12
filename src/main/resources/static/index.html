@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
@@ -19,6 +19,121 @@
         <button id="btnList" class="btn btn-info me-2">Listar Carpetas</button>
       </div>
       <div class="mt-4 text-center" id="responseArea"></div>
+      <hr class="my-5" />
+      <h2 class="text-center mb-4">Subir Documento a FileNet</h2>
+      <form id="uploadForm" enctype="multipart/form-data" class="mb-4">
+        <div class="mb-3">
+          <label for="file" class="form-label">Seleccionar archivo</label>
+          <input type="file" class="form-control" name="file" required />
+        </div>
+        <div class="mb-3">
+          <label for="path" class="form-label"
+            >Ruta en FileNet (ej: /Raíz/...)</label
+          >
+          <input
+            type="text"
+            class="form-control"
+            name="path"
+            placeholder="/Raíz/E1_O1_ADMINISTRACION/E1_O1_COMPUTO"
+            required
+          />
+        </div>
+        <div class="mb-3">
+          <label for="nombre" class="form-label">Nombre del documento</label>
+          <input
+            type="text"
+            class="form-control"
+            name="nombre"
+            placeholder="nombre_documento.pdf"
+            required
+          />
+        </div>
+        <button type="submit" class="btn btn-warning">Subir Documento</button>
+      </form>
+      <div class="mt-4">
+        <h2 class="text-center mb-4">Descargar Documento desde FileNet</h2>
+        <form id="downloadForm" class="mb-4">
+          <div class="mb-3">
+            <label for="downloadPath" class="form-label"
+              >Ruta del documento</label
+            >
+            <input
+              type="text"
+              class="form-control"
+              name="downloadPath"
+              placeholder="/Raíz/E1_O1_ADMINISTRACION/E1_O1_COMPUTO"
+              required
+            />
+          </div>
+          <div class="mb-3">
+            <label for="downloadNombre" class="form-label"
+              >Nombre del documento</label
+            >
+            <input
+              type="text"
+              class="form-control"
+              name="downloadNombre"
+              placeholder="nombre_documento.pdf"
+              required
+            />
+          </div>
+          <button type="submit" class="btn btn-primary">
+            Descargar Documento
+          </button>
+        </form>
+      </div>
+      <div class="mt-4">
+        <h2 class="text-center mb-4">Eliminar Documento de FileNet</h2>
+        <form id="deleteForm" class="mb-4">
+          <div class="mb-3">
+            <label for="deletePath" class="form-label"
+              >Ruta del documento</label
+            >
+            <input
+              type="text"
+              class="form-control"
+              name="deletePath"
+              placeholder="/Raíz/E1_O1_ADMINISTRACION/E1_O1_COMPUTO"
+              required
+            />
+          </div>
+          <div class="mb-3">
+            <label for="deleteNombre" class="form-label"
+              >Nombre del documento</label
+            >
+            <input
+              type="text"
+              class="form-control"
+              name="deleteNombre"
+              placeholder="nombre_documento.pdf"
+              required
+            />
+          </div>
+          <button type="submit" class="btn btn-danger">
+            Eliminar Documento
+          </button>
+        </form>
+      </div>
+
+      <div class="mt-4">
+        <hr class="my-5" />
+        <h2 class="text-center mb-4">Eliminar Carpeta de FileNet</h2>
+        <form id="deleteFolderForm" class="mb-4">
+          <div class="mb-3">
+            <label for="deleteFolderPath" class="form-label"
+              >Ruta de la carpeta</label
+            >
+            <input
+              type="text"
+              class="form-control"
+              name="deleteFolderPath"
+              placeholder="/Raíz/E1_O1_ADMINISTRACION/E1_O1_COMPUTO/Temporal"
+              required
+            />
+          </div>
+          <button type="submit" class="btn btn-danger">Eliminar Carpeta</button>
+        </form>
+      </div>
     </div>
 
     <script>
@@ -28,14 +143,12 @@
           fetch('/api/conectar')
             .then((response) => response.text())
             .then((data) => {
-              document.getElementById(
-                'responseArea'
-              ).innerHTML = `<div class="alert alert-info">${data}</div>`
+              document.getElementById('responseArea').innerHTML =
+                `<div class="alert alert-info">${data}</div>`
             })
             .catch((error) => {
-              document.getElementById(
-                'responseArea'
-              ).innerHTML = `<div class="alert alert-danger">Error: ${error}</div>`
+              document.getElementById('responseArea').innerHTML =
+                `<div class="alert alert-danger">Error: ${error}</div>`
             })
         })
 
@@ -45,14 +158,12 @@
           fetch('/api/documentos/total')
             .then((response) => response.text())
             .then((data) => {
-              document.getElementById(
-                'responseArea'
-              ).innerHTML = `<div class="alert alert-info">${data}</div>`
+              document.getElementById('responseArea').innerHTML =
+                `<div class="alert alert-info">${data}</div>`
             })
             .catch((error) => {
-              document.getElementById(
-                'responseArea'
-              ).innerHTML = `<div class="alert alert-danger">Error: ${error}</div>`
+              document.getElementById('responseArea').innerHTML =
+                `<div class="alert alert-danger">Error: ${error}</div>`
             })
         })
 
@@ -85,6 +196,107 @@
         <div class="alert alert-danger">Error: ${error}</div>`
           })
       })
+
+      document
+        .getElementById('uploadForm')
+        .addEventListener('submit', function (e) {
+          e.preventDefault()
+
+          const formData = new FormData(this)
+
+          fetch('/api/fn/upload', {
+            method: 'POST',
+            body: formData
+          })
+            .then((response) => response.text())
+            .then((data) => {
+              document.getElementById('responseArea').innerHTML =
+                `<div class="alert alert-success">${data}</div>`
+            })
+            .catch((error) => {
+              document.getElementById('responseArea').innerHTML =
+                `<div class="alert alert-danger">Error: ${error}</div>`
+            })
+        })
+
+      document
+        .getElementById('downloadForm')
+        .addEventListener('submit', function (e) {
+          e.preventDefault()
+
+          const path = encodeURIComponent(this.downloadPath.value)
+          const nombre = this.downloadNombre.value
+          const nombreEncoded = encodeURIComponent(nombre)
+          const url = `/api/fn/download?path=${path}&nombre=${nombreEncoded}`
+
+          fetch(url)
+            .then((response) => {
+              if (!response.ok) {
+                return response.text().then((text) => {
+                  throw new Error(text || 'Error al descargar el archivo.')
+                })
+              }
+              return response.blob()
+            })
+            .then((blob) => {
+              const blobUrl = window.URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = blobUrl
+              a.download = nombre
+              document.body.appendChild(a)
+              a.click()
+              a.remove()
+              window.URL.revokeObjectURL(blobUrl)
+              const area = document.getElementById('responseArea')
+              area.innerHTML = `<div class="alert alert-success">Documento descargado con éxito</div>`
+            })
+            .catch((error) => {
+              const area = document.getElementById('responseArea')
+              area.innerHTML = `<div class="alert alert-danger">${error.message}</div>`
+            })
+        })
+
+      document
+        .getElementById('deleteForm')
+        .addEventListener('submit', function (e) {
+          e.preventDefault()
+
+          const path = encodeURIComponent(this.deletePath.value)
+          const nombre = encodeURIComponent(this.deleteNombre.value)
+
+          fetch(`/api/fn/delete?path=${path}&nombre=${nombre}`, {
+            method: 'DELETE'
+          })
+            .then((response) => response.text())
+            .then((data) => {
+              document.getElementById('responseArea').innerHTML =
+                `<div class="alert alert-success">${data}</div>`
+            })
+            .catch((error) => {
+              document.getElementById('responseArea').innerHTML =
+                `<div class="alert alert-danger">Error: ${error.message}</div>`
+            })
+        })
+
+      document
+        .getElementById('deleteFolderForm')
+        .addEventListener('submit', function (e) {
+          e.preventDefault()
+          const path = encodeURIComponent(this.deleteFolderPath.value)
+
+          fetch(`/api/fn/delete-folder?path=${path}`, {
+            method: 'DELETE'
+          })
+            .then((response) => response.text())
+            .then((data) => {
+              document.getElementById('responseArea').innerHTML =
+                `<div class="alert alert-info">${data}</div>`
+            })
+            .catch((error) => {
+              document.getElementById('responseArea').innerHTML =
+                `<div class="alert alert-danger">Error: ${error}</div>`
+            })
+        })
     </script>
   </body>
 </html>
