@@ -1,13 +1,11 @@
 package com.api.filenet.service;
 
-import com.filenet.api.collection.FolderSet;
 import com.filenet.api.core.Connection;
 import com.filenet.api.core.Domain;
 import com.filenet.api.core.Factory;
 import com.filenet.api.core.Folder;
 import com.filenet.api.core.ObjectStore;
 import com.filenet.api.exception.EngineRuntimeException;
-import com.filenet.api.property.Properties;
 import com.filenet.api.util.UserContext;
 import javax.security.auth.Subject;
 

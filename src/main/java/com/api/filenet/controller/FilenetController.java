@@ -57,7 +57,7 @@ public class FilenetController {
       @RequestParam("nombre") String nombreDocumento
     ) {
       try {
-        FilenetService.subirDocumentoDesdeApi(
+        filenetService.subirDocumentoDesdeApi(
           file,
           rutaCarpeta,
           nombreDocumento
@@ -79,14 +79,14 @@ public class FilenetController {
     @GetMapping("/{id}")
     public ResponseEntity<Object> obtenerDocumento(@PathVariable String id) {
       try {
-        Document doc = FilenetService.obtenerDocumentoPorId(id); // Obtiene el documento
+        Document doc = filenetService.obtenerDocumentoPorId(id); // Obtiene el documento
 
         // Obtener título y clase como ejemploa
         String titulo = doc.getProperties().getStringValue("DocumentTitle");
         String clase = doc.getClassName();
 
         // Obtener las ubicaciones del documento
-        List<String> paths = FilenetService.obtenerUbicacionDocumento(id);
+        List<String> paths = filenetService.obtenerUbicacionDocumento(id);
 
         // Retornar como JSON
         Map<String, Object> response = new HashMap<>();

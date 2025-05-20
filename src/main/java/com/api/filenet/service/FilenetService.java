@@ -1,5 +1,6 @@
 package com.api.filenet.service;
 
+import com.api.filenet.config.FilenetProperties;
 import com.api.filenet.exceptions.ErrorException;
 import com.filenet.api.collection.ContentElementList;
 import com.filenet.api.collection.DocumentSet;
@@ -13,6 +14,7 @@ import com.filenet.api.constants.CheckinType;
 import com.filenet.api.constants.DefineSecurityParentage;
 import com.filenet.api.constants.PropertyNames;
 import com.filenet.api.constants.RefreshMode;
+import com.filenet.api.constants.ReservationType;
 import com.filenet.api.core.Connection;
 import com.filenet.api.core.ContentTransfer;
 import com.filenet.api.core.Document;
@@ -37,30 +39,41 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+//import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class FilenetService {
 
+  // @Value("${filenet.ce.uri}")
+  // private String ceUri;
+
+  private final FilenetProperties properties;
+
+  public FilenetService(FilenetProperties properties) {
+    this.properties = properties;
+  }
+
   private static final String CE_URI =
     "http://52.118.253.28:9080/wsi/FNCEWS40MTOM/";
-  private static final String USERNAME = "usrvfnadm";
-  private static final String PASSWORD = "UcSG.241014$";
-  private static final String OBJECT_STORE_NAME = "UCSG-1";
-  private static final String CLASE_DOCUMENTO = "Document";
-  private static final String DOCUMENT_TITLE = "DocumentTitle";
+  // private static final String USERNAME = "usrvfnadm";
+  // private static final String PASSWORD = "UcSG.241014$";
+  // private static final String OBJECT_STORE_NAME = "UCSG-1";
+  //private static final String CLASE_DOCUMENTO = "Document";
+  //private static final String DOCUMENT_TITLE = "DocumentTitle";
+
   private static final Logger logger = LoggerFactory.getLogger(
     FilenetService.class
   );
 
   public String connectAndFetch() {
     try {
-      Connection conn = Factory.Connection.getConnection(CE_URI);
+      Connection conn = Factory.Connection.getConnection(properties.getCeUri());
       Subject subject = UserContext.createSubject(
         conn,
-        USERNAME,
-        PASSWORD,
+        properties.getUsername(),
+        properties.getPassword(),
         null
       );
       UserContext.get().pushSubject(subject);
@@ -68,7 +81,7 @@ public class FilenetService {
       Domain domain = Factory.Domain.fetchInstance(conn, null, null);
       ObjectStore store = Factory.ObjectStore.fetchInstance(
         domain,
-        OBJECT_STORE_NAME,
+        properties.getObjectStoreName(),
         null
       );
 
@@ -84,8 +97,8 @@ public class FilenetService {
       Connection conn = Factory.Connection.getConnection(CE_URI);
       Subject subject = UserContext.createSubject(
         conn,
-        USERNAME,
-        PASSWORD,
+        properties.getUsername(),
+        properties.getPassword(),
         null
       );
       UserContext.get().pushSubject(subject);
@@ -93,7 +106,7 @@ public class FilenetService {
       Domain domain = Factory.Domain.fetchInstance(conn, null, null);
       ObjectStore store = Factory.ObjectStore.fetchInstance(
         domain,
-        OBJECT_STORE_NAME,
+        properties.getObjectStoreName(),
         null
       );
 
@@ -124,8 +137,8 @@ public class FilenetService {
       Connection conn = Factory.Connection.getConnection(CE_URI);
       Subject subject = UserContext.createSubject(
         conn,
-        USERNAME,
-        PASSWORD,
+        properties.getUsername(),
+        properties.getPassword(),
         null
       );
       UserContext.get().pushSubject(subject);
@@ -133,7 +146,7 @@ public class FilenetService {
       Domain domain = Factory.Domain.fetchInstance(conn, null, null);
       ObjectStore store = Factory.ObjectStore.fetchInstance(
         domain,
-        OBJECT_STORE_NAME,
+        properties.getObjectStoreName(),
         null
       );
 
@@ -195,7 +208,7 @@ public class FilenetService {
   }
 
   @SuppressWarnings("unchecked")
-  public static void subirDocumentoDesdeApi(
+  public void subirDocumentoDesdeApi(
     MultipartFile file,
     String rutaCarpeta,
     String nombreDocumento
@@ -205,8 +218,8 @@ public class FilenetService {
       Connection conn = Factory.Connection.getConnection(CE_URI);
       Subject subject = UserContext.createSubject(
         conn,
-        USERNAME,
-        PASSWORD,
+        properties.getUsername(),
+        properties.getPassword(),
         null
       );
       UserContext.get().pushSubject(subject);
@@ -214,19 +227,41 @@ public class FilenetService {
       Domain domain = Factory.Domain.fetchInstance(conn, null, null);
       ObjectStore store = Factory.ObjectStore.fetchInstance(
         domain,
-        OBJECT_STORE_NAME,
+        properties.getObjectStoreName(),
         null
       );
 
       Folder folderDestino = crearCarpeta(store, rutaCarpeta);
       logger.info("Destino OK: {}", folderDestino.get_PathName());
 
-      // Crear documento
-      Document doc = Factory.Document.createInstance(
-        store,
-        CLASE_DOCUMENTO,
-        null
+      Document documentoExistente = buscarDocumentoPorNombre(
+        folderDestino,
+        nombreDocumento
       );
+
+      Document doc;
+
+      if (documentoExistente != null) {
+        logger.info("📝 Documento ya existe, se creará nueva versión");
+
+        // Check-out para versionar
+        documentoExistente.checkout(
+          ReservationType.EXCLUSIVE,
+          null,
+          null,
+          null
+        );
+        documentoExistente.save(RefreshMode.REFRESH);
+
+        doc = (Document) documentoExistente.get_Reservation();
+      } else {
+        logger.info("🆕 Documento nuevo");
+        doc = Factory.Document.createInstance(
+          store,
+          properties.getClaseDocumento(),
+          null
+        );
+      }
 
       // Crear contenido
       ContentTransfer ct = Factory.ContentTransfer.createInstance();
@@ -239,7 +274,9 @@ public class FilenetService {
       // Asignar propiedades
       doc.set_ContentElements(cel);
       doc.set_MimeType(file.getContentType());
-      doc.getProperties().putValue(DOCUMENT_TITLE, nombreDocumento);
+      doc
+        .getProperties()
+        .putValue(properties.getDocumentTitle(), nombreDocumento);
 
       doc.checkin(AutoClassify.DO_NOT_AUTO_CLASSIFY, CheckinType.MAJOR_VERSION);
       doc.save(RefreshMode.REFRESH);
@@ -262,6 +299,27 @@ public class FilenetService {
         e
       );
     }
+  }
+
+  private static Document buscarDocumentoPorNombre(
+    Folder carpeta,
+    String nombreDocumento
+  ) {
+    try {
+      DocumentSet docs = carpeta.get_ContainedDocuments();
+      Iterator<?> iter = docs.iterator();
+
+      while (iter.hasNext()) {
+        Document doc = (Document) iter.next();
+        String titulo = doc.getProperties().getStringValue("DocumentTitle");
+        if (titulo != null && titulo.equalsIgnoreCase(nombreDocumento)) {
+          return doc;
+        }
+      }
+    } catch (Exception e) {
+      logger.warn("Error buscando documento: {}", e.getMessage());
+    }
+    return null;
   }
 
   private static Folder crearCarpeta(ObjectStore store, String rutaCarpeta)
@@ -310,18 +368,23 @@ public class FilenetService {
     return parent; // Retornamos la última carpeta creada o existente
   }
 
-  public static Document obtenerDocumentoPorId(String idDocumento)
+  public Document obtenerDocumentoPorId(String idDocumento)
     throws ErrorException {
     // Conectarse a FileNet
     Connection conn = Factory.Connection.getConnection(CE_URI);
-    Subject subject = UserContext.createSubject(conn, USERNAME, PASSWORD, null);
+    Subject subject = UserContext.createSubject(
+      conn,
+      properties.getUsername(),
+      properties.getPassword(),
+      null
+    );
     UserContext.get().pushSubject(subject);
 
     // Obtener el dominio y el object store
     Domain domain = Factory.Domain.fetchInstance(conn, null, null);
     ObjectStore store = Factory.ObjectStore.fetchInstance(
       domain,
-      OBJECT_STORE_NAME,
+      properties.getObjectStoreName(),
       null
     );
 
@@ -334,23 +397,28 @@ public class FilenetService {
     logger.info("ID: {}", doc.get_Id());
     logger.info(
       "Nombre: {}",
-      doc.getProperties().getStringValue(DOCUMENT_TITLE)
+      doc.getProperties().getStringValue(properties.getDocumentTitle())
     );
     logger.info("Clase: {}", doc.get_ClassDescription().get_DisplayName());
 
     return doc;
   }
 
-  public static List<String> obtenerUbicacionDocumento(String idDocumento)
+  public List<String> obtenerUbicacionDocumento(String idDocumento)
     throws ErrorException {
     Connection conn = Factory.Connection.getConnection(CE_URI);
-    Subject subject = UserContext.createSubject(conn, USERNAME, PASSWORD, null);
+    Subject subject = UserContext.createSubject(
+      conn,
+      properties.getUsername(),
+      properties.getPassword(),
+      null
+    );
     UserContext.get().pushSubject(subject);
 
     Domain domain = Factory.Domain.fetchInstance(conn, null, null);
     ObjectStore store = Factory.ObjectStore.fetchInstance(
       domain,
-      OBJECT_STORE_NAME,
+      properties.getObjectStoreName(),
       null
     );
 
@@ -386,13 +454,18 @@ public class FilenetService {
     String nombreDocumento
   ) throws ErrorException {
     Connection conn = Factory.Connection.getConnection(CE_URI);
-    Subject subject = UserContext.createSubject(conn, USERNAME, PASSWORD, null);
+    Subject subject = UserContext.createSubject(
+      conn,
+      properties.getUsername(),
+      properties.getPassword(),
+      null
+    );
     UserContext.get().pushSubject(subject);
 
     Domain domain = Factory.Domain.fetchInstance(conn, null, null);
     ObjectStore store = Factory.ObjectStore.fetchInstance(
       domain,
-      OBJECT_STORE_NAME,
+      properties.getObjectStoreName(),
       null
     );
 
@@ -420,7 +493,9 @@ public class FilenetService {
       Object obj = it.next();
       if (obj instanceof Document d) {
         try {
-          String titulo = d.getProperties().getStringValue(DOCUMENT_TITLE);
+          String titulo = d
+            .getProperties()
+            .getStringValue(properties.getDocumentTitle());
           if (titulo != null && titulo.equals(nombreDocumento)) {
             logger.info("✅ Documento encontrado: {}", titulo);
             return d;
@@ -464,13 +539,18 @@ public class FilenetService {
   public boolean eliminarDocumento(String rutaCarpeta, String nombreDocumento)
     throws ErrorException {
     Connection conn = Factory.Connection.getConnection(CE_URI);
-    Subject subject = UserContext.createSubject(conn, USERNAME, PASSWORD, null);
+    Subject subject = UserContext.createSubject(
+      conn,
+      properties.getUsername(),
+      properties.getPassword(),
+      null
+    );
     UserContext.get().pushSubject(subject);
 
     Domain domain = Factory.Domain.fetchInstance(conn, null, null);
     ObjectStore store = Factory.ObjectStore.fetchInstance(
       domain,
-      OBJECT_STORE_NAME,
+      properties.getObjectStoreName(),
       null
     );
 
@@ -483,7 +563,9 @@ public class FilenetService {
     Iterator<?> iterator = documentos.iterator();
     while (iterator.hasNext()) {
       Document doc = (Document) iterator.next();
-      String titulo = doc.getProperties().getStringValue(DOCUMENT_TITLE);
+      String titulo = doc
+        .getProperties()
+        .getStringValue(properties.getDocumentTitle());
       logger.info("🔍 Documento en carpeta: {}", titulo);
       if (titulo.equals(nombreDocumento)) {
         docAEliminar = doc;
@@ -506,13 +588,18 @@ public class FilenetService {
   public String eliminarCarpetaConContenido(String rutaCarpeta)
     throws ErrorException {
     Connection conn = Factory.Connection.getConnection(CE_URI);
-    Subject subject = UserContext.createSubject(conn, USERNAME, PASSWORD, null);
+    Subject subject = UserContext.createSubject(
+      conn,
+      properties.getUsername(),
+      properties.getPassword(),
+      null
+    );
     UserContext.get().pushSubject(subject);
 
     Domain domain = Factory.Domain.fetchInstance(conn, null, null);
     ObjectStore store = Factory.ObjectStore.fetchInstance(
       domain,
-      OBJECT_STORE_NAME,
+      properties.getObjectStoreName(),
       null
     );
 
