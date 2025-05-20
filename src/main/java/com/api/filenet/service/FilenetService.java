@@ -55,8 +55,8 @@ public class FilenetService {
     this.properties = properties;
   }
 
-  private static final String CE_URI =
-    "http://52.118.253.28:9080/wsi/FNCEWS40MTOM/";
+  // private static final String CE_URI =
+  //   "http://52.118.253.28:9080/wsi/FNCEWS40MTOM/";
   // private static final String USERNAME = "usrvfnadm";
   // private static final String PASSWORD = "UcSG.241014$";
   // private static final String OBJECT_STORE_NAME = "UCSG-1";
@@ -94,7 +94,7 @@ public class FilenetService {
 
   public String contarDocumentos() {
     try {
-      Connection conn = Factory.Connection.getConnection(CE_URI);
+      Connection conn = Factory.Connection.getConnection(properties.getCeUri());
       Subject subject = UserContext.createSubject(
         conn,
         properties.getUsername(),
@@ -134,7 +134,7 @@ public class FilenetService {
     JSONArray carpetas = new JSONArray();
 
     try {
-      Connection conn = Factory.Connection.getConnection(CE_URI);
+      Connection conn = Factory.Connection.getConnection(properties.getCeUri());
       Subject subject = UserContext.createSubject(
         conn,
         properties.getUsername(),
@@ -215,7 +215,7 @@ public class FilenetService {
   ) throws ErrorException {
     try {
       // Conexión y autenticación
-      Connection conn = Factory.Connection.getConnection(CE_URI);
+      Connection conn = Factory.Connection.getConnection(properties.getCeUri());
       Subject subject = UserContext.createSubject(
         conn,
         properties.getUsername(),
@@ -371,7 +371,7 @@ public class FilenetService {
   public Document obtenerDocumentoPorId(String idDocumento)
     throws ErrorException {
     // Conectarse a FileNet
-    Connection conn = Factory.Connection.getConnection(CE_URI);
+    Connection conn = Factory.Connection.getConnection(properties.getCeUri());
     Subject subject = UserContext.createSubject(
       conn,
       properties.getUsername(),
@@ -406,7 +406,7 @@ public class FilenetService {
 
   public List<String> obtenerUbicacionDocumento(String idDocumento)
     throws ErrorException {
-    Connection conn = Factory.Connection.getConnection(CE_URI);
+    Connection conn = Factory.Connection.getConnection(properties.getCeUri());
     Subject subject = UserContext.createSubject(
       conn,
       properties.getUsername(),
@@ -453,7 +453,7 @@ public class FilenetService {
     String rutaCarpeta,
     String nombreDocumento
   ) throws ErrorException {
-    Connection conn = Factory.Connection.getConnection(CE_URI);
+    Connection conn = Factory.Connection.getConnection(properties.getCeUri());
     Subject subject = UserContext.createSubject(
       conn,
       properties.getUsername(),
@@ -538,7 +538,7 @@ public class FilenetService {
 
   public boolean eliminarDocumento(String rutaCarpeta, String nombreDocumento)
     throws ErrorException {
-    Connection conn = Factory.Connection.getConnection(CE_URI);
+    Connection conn = Factory.Connection.getConnection(properties.getCeUri());
     Subject subject = UserContext.createSubject(
       conn,
       properties.getUsername(),
@@ -587,7 +587,7 @@ public class FilenetService {
 
   public String eliminarCarpetaConContenido(String rutaCarpeta)
     throws ErrorException {
-    Connection conn = Factory.Connection.getConnection(CE_URI);
+    Connection conn = Factory.Connection.getConnection(properties.getCeUri());
     Subject subject = UserContext.createSubject(
       conn,
       properties.getUsername(),
