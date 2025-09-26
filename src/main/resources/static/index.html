@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
@@ -134,6 +134,26 @@
           <button type="submit" class="btn btn-danger">Eliminar Carpeta</button>
         </form>
       </div>
+
+      <div class="mt-4">
+        <hr class="my-5" />
+        <h2 class="text-center mb-4">Listar Propiedades de una Clase</h2>
+        <form id="propertiesForm" class="mb-4">
+          <div class="mb-3">
+            <label for="className" class="form-label">Nombre de la clase</label>
+            <input
+              type="text"
+              class="form-control"
+              name="className"
+              placeholder="resolucionesDoc"
+              required
+            />
+          </div>
+          <button type="submit" class="btn btn-secondary">
+            Obtener Propiedades
+          </button>
+        </form>
+      </div>
     </div>
 
     <script>
@@ -143,12 +163,14 @@
           fetch('/api/conectar')
             .then((response) => response.text())
             .then((data) => {
-              document.getElementById('responseArea').innerHTML =
-                `<div class="alert alert-info">${data}</div>`
+              document.getElementById(
+                'responseArea'
+              ).innerHTML = `<div class="alert alert-info">${data}</div>`
             })
             .catch((error) => {
-              document.getElementById('responseArea').innerHTML =
-                `<div class="alert alert-danger">Error: ${error}</div>`
+              document.getElementById(
+                'responseArea'
+              ).innerHTML = `<div class="alert alert-danger">Error: ${error}</div>`
             })
         })
 
@@ -158,12 +180,14 @@
           fetch('/api/documentos/total')
             .then((response) => response.text())
             .then((data) => {
-              document.getElementById('responseArea').innerHTML =
-                `<div class="alert alert-info">${data}</div>`
+              document.getElementById(
+                'responseArea'
+              ).innerHTML = `<div class="alert alert-info">${data}</div>`
             })
             .catch((error) => {
-              document.getElementById('responseArea').innerHTML =
-                `<div class="alert alert-danger">Error: ${error}</div>`
+              document.getElementById(
+                'responseArea'
+              ).innerHTML = `<div class="alert alert-danger">Error: ${error}</div>`
             })
         })
 
@@ -210,12 +234,14 @@
           })
             .then((response) => response.text())
             .then((data) => {
-              document.getElementById('responseArea').innerHTML =
-                `<div class="alert alert-success">${data}</div>`
+              document.getElementById(
+                'responseArea'
+              ).innerHTML = `<div class="alert alert-success">${data}</div>`
             })
             .catch((error) => {
-              document.getElementById('responseArea').innerHTML =
-                `<div class="alert alert-danger">Error: ${error}</div>`
+              document.getElementById(
+                'responseArea'
+              ).innerHTML = `<div class="alert alert-danger">Error: ${error}</div>`
             })
         })
 
@@ -269,12 +295,14 @@
           })
             .then((response) => response.text())
             .then((data) => {
-              document.getElementById('responseArea').innerHTML =
-                `<div class="alert alert-success">${data}</div>`
+              document.getElementById(
+                'responseArea'
+              ).innerHTML = `<div class="alert alert-success">${data}</div>`
             })
             .catch((error) => {
-              document.getElementById('responseArea').innerHTML =
-                `<div class="alert alert-danger">Error: ${error.message}</div>`
+              document.getElementById(
+                'responseArea'
+              ).innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`
             })
         })
 
@@ -289,12 +317,57 @@
           })
             .then((response) => response.text())
             .then((data) => {
-              document.getElementById('responseArea').innerHTML =
-                `<div class="alert alert-info">${data}</div>`
+              document.getElementById(
+                'responseArea'
+              ).innerHTML = `<div class="alert alert-info">${data}</div>`
             })
             .catch((error) => {
-              document.getElementById('responseArea').innerHTML =
-                `<div class="alert alert-danger">Error: ${error}</div>`
+              document.getElementById(
+                'responseArea'
+              ).innerHTML = `<div class="alert alert-danger">Error: ${error}</div>`
+            })
+        })
+
+      document
+        .getElementById('propertiesForm')
+        .addEventListener('submit', function (e) {
+          e.preventDefault()
+
+          const className = encodeURIComponent(this.className.value)
+
+          fetch(`/api/fn/properties/${className}`)
+            .then((response) => {
+              if (!response.ok) {
+                return response.text().then((text) => {
+                  throw new Error(text || 'Error al obtener propiedades')
+                })
+              }
+              return response.json()
+            })
+            .then((data) => {
+              let html = `<h5>Propiedades de la clase <strong>${this.className.value}</strong>:</h5><ul class="list-group">`
+
+              data.forEach((prop) => {
+                html += `<li class="list-group-item">
+              <strong>${prop.name}</strong> <span class="badge bg-primary">${prop.type}</span>`
+
+                if (prop.choices) {
+                  html += `<br><small class="text-muted">Valores permitidos:</small><ul>`
+                  prop.choices.forEach((choice) => {
+                    html += `<li>${choice.displayName} (${choice.value})</li>`
+                  })
+                  html += `</ul>`
+                }
+
+                html += `</li>`
+              })
+
+              html += '</ul>'
+              document.getElementById('responseArea').innerHTML = html
+            })
+            .catch((error) => {
+              document.getElementById('responseArea').innerHTML = `
+          <div class="alert alert-danger">Error: ${error.message}</div>`
             })
         })
     </script>

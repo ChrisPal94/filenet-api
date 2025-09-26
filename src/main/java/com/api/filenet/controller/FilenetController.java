@@ -1,5 +1,6 @@
 package com.api.filenet.controller;
 
+import com.api.filenet.dto.CustomResponse;
 import com.api.filenet.exceptions.ErrorException;
 import com.api.filenet.service.FilenetService;
 import com.filenet.api.core.Document;
@@ -9,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -54,13 +56,19 @@ public class FilenetController {
     public ResponseEntity<String> subirDocumento(
       @RequestParam("file") MultipartFile file,
       @RequestParam("path") String rutaCarpeta,
-      @RequestParam("nombre") String nombreDocumento
+      @RequestParam("nombre") String nombreDocumento,
+      @RequestParam Map<String, String> metadata
     ) {
       try {
+        metadata.remove("path");
+        metadata.remove("nombre");
+        metadata.remove("file"); // aunque file ya va como MultipartFile
+
         filenetService.subirDocumentoDesdeApi(
           file,
           rutaCarpeta,
-          nombreDocumento
+          nombreDocumento,
+          metadata
         );
         return ResponseEntity.ok("Documento subido correctamente.");
       } catch (Exception e) {
@@ -180,6 +188,46 @@ public class FilenetController {
           "❌ Error al eliminar la carpeta: " + e.getMessage()
         );
       }
+    }
+
+    @GetMapping("/properties/{className}")
+    public List<Map<String, Object>> getProperties(
+      @PathVariable String className
+    ) {
+      return filenetService.getCustomPropertiesAll(className);
+    }
+
+    @GetMapping("/choices/{className}")
+    public CustomResponse getChoices(@PathVariable String className) {
+      return filenetService.getCustomProperties(className);
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<?> buscarDocumentos(
+      @RequestParam(required = false) String nombreDocumento,
+      @RequestParam(required = false) String fechaDocumento,
+      @RequestParam(required = false) String enteRegulatorio
+    ) {
+      try {
+        List<Map<String, Object>> resultados = filenetService.buscarDocumentos(
+          nombreDocumento,
+          fechaDocumento,
+          enteRegulatorio
+        );
+        return ResponseEntity.ok(resultados);
+      } catch (Exception e) {
+        e.printStackTrace();
+        return ResponseEntity.status(500).body(
+          "❌ Error en la búsqueda: " + e.getMessage()
+        );
+      }
+    }
+
+    @GetMapping("/download/{id}")
+    public ResponseEntity<Resource> descargarDocumento(
+      @PathVariable("id") String docId
+    ) {
+      return filenetService.descargarDocumento(docId);
     }
   }
 }

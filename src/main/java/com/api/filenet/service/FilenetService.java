@@ -1,12 +1,18 @@
 package com.api.filenet.service;
 
 import com.api.filenet.config.FilenetProperties;
+import com.api.filenet.dto.ChoiceDTO;
+import com.api.filenet.dto.CustomResponse;
+import com.api.filenet.dto.PropertyChoicesDTO;
 import com.api.filenet.exceptions.ErrorException;
+import com.filenet.api.admin.Choice;
+import com.filenet.api.admin.ChoiceList;
 import com.filenet.api.collection.ContentElementList;
 import com.filenet.api.collection.DocumentSet;
 import com.filenet.api.collection.EngineCollection;
 import com.filenet.api.collection.FolderSet;
 import com.filenet.api.collection.IndependentObjectSet;
+import com.filenet.api.collection.PropertyDescriptionList;
 import com.filenet.api.collection.RepositoryRowSet;
 import com.filenet.api.constants.AutoClassify;
 import com.filenet.api.constants.AutoUniqueName;
@@ -25,20 +31,33 @@ import com.filenet.api.core.ObjectStore;
 import com.filenet.api.core.ReferentialContainmentRelationship;
 import com.filenet.api.exception.EngineRuntimeException;
 import com.filenet.api.exception.ExceptionCode;
+import com.filenet.api.meta.ClassDescription;
+import com.filenet.api.meta.PropertyDescription;
 import com.filenet.api.query.RepositoryRow;
 import com.filenet.api.query.SearchSQL;
 import com.filenet.api.query.SearchScope;
 import com.filenet.api.util.Id;
 import com.filenet.api.util.UserContext;
 import java.io.InputStream;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import javax.security.auth.Subject;
 import org.apache.commons.lang3.tuple.Pair;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 //import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -211,7 +230,8 @@ public class FilenetService {
   public void subirDocumentoDesdeApi(
     MultipartFile file,
     String rutaCarpeta,
-    String nombreDocumento
+    String nombreDocumento,
+    Map<String, String> metadata
   ) throws ErrorException {
     try {
       // Conexión y autenticación
@@ -277,6 +297,32 @@ public class FilenetService {
       doc
         .getProperties()
         .putValue(properties.getDocumentTitle(), nombreDocumento);
+
+      // 5. Agregar metadatos personalizados
+      for (Map.Entry<String, String> entry : metadata.entrySet()) {
+        String propName = entry.getKey();
+        String propValue = entry.getValue();
+        try {
+          if ("FechaDocumento".equals(propName)) {
+            // Ajusta el formato al que envías desde el front (ej: yyyy-MM-dd)
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            Date fecha = sdf.parse(propValue);
+            doc.getProperties().putValue(propName, fecha);
+          } else {
+            // el resto se cargan como String
+            doc.getProperties().putValue(propName, propValue);
+          }
+        } catch (Exception ex) {
+          System.out.println(
+            "⚠️ Propiedad no encontrada o tipo inválido: " + propName
+          );
+        }
+        /*try {
+          doc.getProperties().putValue(propName, propValue);
+        } catch (EngineRuntimeException ex) {
+          System.out.println("⚠️ Propiedad no encontrada: " + propName);
+        }*/
+      }
 
       doc.checkin(AutoClassify.DO_NOT_AUTO_CLASSIFY, CheckinType.MAJOR_VERSION);
       doc.save(RefreshMode.REFRESH);
@@ -632,6 +678,321 @@ public class FilenetService {
         return "❌ La carpeta no existe.";
       }
       throw e;
+    }
+  }
+
+  public List<Map<String, Object>> getCustomPropertiesAll(String className) {
+    List<Map<String, Object>> result = new ArrayList<>();
+
+    Connection conn = Factory.Connection.getConnection(properties.getCeUri());
+    Subject subject = UserContext.createSubject(
+      conn,
+      properties.getUsername(),
+      properties.getPassword(),
+      null
+    );
+    UserContext.get().pushSubject(subject);
+
+    try {
+      Domain domain = Factory.Domain.fetchInstance(conn, null, null);
+      ObjectStore store = Factory.ObjectStore.fetchInstance(
+        domain,
+        properties.getObjectStoreName(),
+        null
+      );
+
+      ClassDescription cd = Factory.ClassDescription.fetchInstance(
+        store,
+        className,
+        null
+      );
+      PropertyDescriptionList pds = cd.get_PropertyDescriptions();
+
+      for (Object pdObj : pds) {
+        PropertyDescription pd = (PropertyDescription) pdObj;
+
+        // Solo propiedades personalizadas (no del sistema)
+        if (!pd.get_IsSystemOwned()) {
+          String propName = pd.get_SymbolicName();
+          if (
+            !propName.startsWith("DocumentTitle") &&
+            !propName.startsWith("EntryTemplate") &&
+            !propName.startsWith("Clb") &&
+            !propName.startsWith("ComponentBindingLabel") &&
+            !propName.startsWith("IgnoreRedirect")
+          ) {
+            Map<String, Object> propInfo = new LinkedHashMap<>();
+            propInfo.put("name", propName);
+            propInfo.put("type", pd.get_DataType().toString());
+
+            // Si tiene ChoiceList asociada, lo agregamos
+            ChoiceList choiceList = pd.get_ChoiceList();
+            if (choiceList != null) {
+              List<Map<String, String>> choices = new ArrayList<>();
+              for (Object choiceObj : choiceList.get_ChoiceValues()) {
+                Choice choice = (Choice) choiceObj;
+                Map<String, String> c = new HashMap<>();
+                c.put("displayName", choice.get_DisplayName());
+                c.put("value", choice.get_ChoiceStringValue());
+                choices.add(c);
+              }
+              propInfo.put("choices", choices);
+            }
+
+            result.add(propInfo);
+          }
+        }
+      }
+    } finally {
+      UserContext.get().popSubject();
+    }
+
+    return result;
+  }
+
+  public CustomResponse getCustomProperties(String className) {
+    List<PropertyChoicesDTO> propertiesWithChoices = new ArrayList<>();
+
+    Connection conn = Factory.Connection.getConnection(properties.getCeUri());
+    Subject subject = UserContext.createSubject(
+      conn,
+      properties.getUsername(),
+      properties.getPassword(),
+      null
+    );
+    UserContext.get().pushSubject(subject);
+
+    try {
+      Domain domain = Factory.Domain.fetchInstance(conn, null, null);
+      ObjectStore store = Factory.ObjectStore.fetchInstance(
+        domain,
+        properties.getObjectStoreName(),
+        null
+      );
+
+      ClassDescription cd = Factory.ClassDescription.fetchInstance(
+        store,
+        className,
+        null
+      );
+      PropertyDescriptionList pds = cd.get_PropertyDescriptions();
+
+      for (Object pdObj : pds) {
+        PropertyDescription pd = (PropertyDescription) pdObj;
+
+        if (!pd.get_IsSystemOwned()) {
+          ChoiceList choiceList = pd.get_ChoiceList();
+
+          // Solo devolver propiedades que tengan ChoiceList
+          if (choiceList != null) {
+            List<ChoiceDTO> choices = new ArrayList<>();
+            for (Object choiceObj : choiceList.get_ChoiceValues()) {
+              Choice choice = (Choice) choiceObj;
+              choices.add(
+                new ChoiceDTO(
+                  choice.get_DisplayName(),
+                  choice.get_ChoiceStringValue()
+                )
+              );
+            }
+
+            propertiesWithChoices.add(
+              new PropertyChoicesDTO(pd.get_SymbolicName(), choices)
+            );
+          }
+        }
+      }
+    } finally {
+      UserContext.get().popSubject();
+    }
+
+    return new CustomResponse(true, propertiesWithChoices);
+  }
+
+  public List<Map<String, Object>> buscarDocumentos(
+    String nombreDocumento,
+    String fechaDocumento,
+    String enteRegulatorio
+  ) throws Exception {
+    List<Map<String, Object>> resultados = new ArrayList<>();
+
+    Connection conn = Factory.Connection.getConnection(properties.getCeUri());
+    Subject subject = UserContext.createSubject(
+      conn,
+      properties.getUsername(),
+      properties.getPassword(),
+      null
+    );
+    UserContext.get().pushSubject(subject);
+
+    try {
+      Domain domain = Factory.Domain.fetchInstance(conn, null, null);
+      ObjectStore os = Factory.ObjectStore.fetchInstance(
+        domain,
+        properties.getObjectStoreName(),
+        null
+      );
+
+      // Construir query
+      StringBuilder query = new StringBuilder(
+        "SELECT d.DocumentTitle, d.FechaDocumento, d.Nombre, d.EnteRegulatorio, d.Id, d.Anio " +
+        "FROM resolucionesDoc d WHERE 1=1"
+      );
+
+      if (nombreDocumento != null && !nombreDocumento.isEmpty()) {
+        query
+          .append(" AND d.DocumentTitle LIKE '%")
+          .append(nombreDocumento)
+          .append("%'");
+      }
+      if (fechaDocumento != null && !fechaDocumento.isEmpty()) {
+        query
+          .append(" AND d.FechaDocumento = DATE('")
+          .append(fechaDocumento)
+          .append("')");
+      }
+      if (enteRegulatorio != null && !enteRegulatorio.isEmpty()) {
+        query
+          .append(" AND d.EnteRegulatorio LIKE '%")
+          .append(enteRegulatorio)
+          .append("%'");
+      }
+
+      SearchSQL sql = new SearchSQL(query.toString());
+      SearchScope scope = new SearchScope(os);
+
+      RepositoryRowSet rowSet = scope.fetchRows(
+        sql,
+        null,
+        null,
+        Boolean.valueOf(true)
+      );
+      Iterator<?> it = rowSet.iterator();
+
+      /* while (it.hasNext()) {
+        RepositoryRow row = (RepositoryRow) it.next();
+        Map<String, Object> doc = new HashMap<>();
+        doc.put(
+          "DocumentTitle",
+          row.getProperties().getStringValue("DocumentTitle")
+        );
+        doc.put(
+          "FechaDocumento",
+          row.getProperties().getDateTimeValue("FechaDocumento")
+        );
+        doc.put("Nombre", row.getProperties().getStringValue("Nombre"));
+        doc.put(
+          "EnteRegulatorio",
+          row.getProperties().getStringValue("EnteRegulatorio")
+        );
+        doc.put("Anio", row.getProperties().getStringValue("Anio"));
+        doc.put("Id", row.getProperties().getIdValue("Id").toString());
+        resultados.add(doc);
+      } */
+
+      while (it.hasNext()) {
+        RepositoryRow row = (RepositoryRow) it.next();
+        Map<String, Object> doc = new HashMap<>();
+        doc.put(
+          "DocumentTitle",
+          row.getProperties().getStringValue("DocumentTitle")
+        );
+        doc.put(
+          "FechaDocumento",
+          row.getProperties().getDateTimeValue("FechaDocumento")
+        );
+        String nombre = row.getProperties().getStringValue("Nombre");
+        doc.put("Nombre", nombre);
+        doc.put(
+          "EnteRegulatorio",
+          row.getProperties().getStringValue("EnteRegulatorio")
+        );
+        doc.put("Anio", row.getProperties().getStringValue("Anio"));
+        String id = row.getProperties().getIdValue("Id").toString();
+        doc.put("Id", id);
+
+        // 🔹 Obtener extensión del contenido
+        Document documento = Factory.Document.fetchInstance(
+          os,
+          new Id(id),
+          null
+        );
+        ContentElementList contenidos = documento.get_ContentElements();
+        if (contenidos != null && !contenidos.isEmpty()) {
+          ContentTransfer ct = (ContentTransfer) contenidos.get(0);
+          String retrievalName = ct.get_RetrievalName(); // nombre original con extensión
+          if (retrievalName != null && retrievalName.contains(".")) {
+            String extension = retrievalName.substring(
+              retrievalName.lastIndexOf(".") + 1
+            );
+
+            // Guardar extensión sola
+            doc.put("Extension", extension);
+
+            // Guardar nombre + extensión
+            doc.put("NombreCompleto", nombre + "." + extension);
+          } else {
+            doc.put("Extension", "desconocido");
+            doc.put("NombreCompleto", nombre);
+          }
+        } else {
+          doc.put("Extension", "sin contenido");
+          doc.put("NombreCompleto", nombre);
+        }
+
+        resultados.add(doc);
+      }
+    } finally {
+      UserContext.get().popSubject();
+    }
+
+    return resultados;
+  }
+
+  public ResponseEntity<Resource> descargarDocumento(String docId) {
+    try {
+      Connection conn = Factory.Connection.getConnection(properties.getCeUri());
+      Subject subject = UserContext.createSubject(
+        conn,
+        properties.getUsername(),
+        properties.getPassword(),
+        null
+      );
+      UserContext.get().pushSubject(subject);
+      Domain domain = Factory.Domain.fetchInstance(conn, null, null);
+      ObjectStore os = Factory.ObjectStore.fetchInstance(
+        domain,
+        properties.getObjectStoreName(),
+        null
+      );
+
+      // Buscar el documento por ID
+      Document doc = Factory.Document.fetchInstance(os, new Id(docId), null);
+
+      // Obtener el contenido
+      ContentElementList contentList = doc.get_ContentElements();
+      if (contentList == null || contentList.isEmpty()) {
+        return ResponseEntity.notFound().build();
+      }
+
+      ContentTransfer ct = (ContentTransfer) contentList.get(0);
+      InputStream inputStream = ct.accessContentStream();
+
+      // Preparar respuesta HTTP
+      InputStreamResource resource = new InputStreamResource(inputStream);
+
+      return ResponseEntity.ok()
+        .header(
+          HttpHeaders.CONTENT_DISPOSITION,
+          "attachment; filename=\"" + doc.get_Name() + "\""
+        )
+        .contentType(MediaType.APPLICATION_OCTET_STREAM)
+        .body(resource);
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ResponseEntity.internalServerError().body(null);
+    } finally {
+      UserContext.get().popSubject();
     }
   }
 }

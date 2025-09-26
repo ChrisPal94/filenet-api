@@ -1,5 +1,7 @@
 package com.api.filenet.service;
 
+import com.filenet.api.admin.Choice;
+import com.filenet.api.admin.ChoiceList;
 import com.filenet.api.collection.PropertyDescriptionList;
 import com.filenet.api.constants.TypeID;
 import com.filenet.api.core.*;
@@ -12,8 +14,8 @@ public class PropertyMetadataExplorer {
   public static void main(String[] args) {
     String uri = "http://52.118.253.28:9080/wsi/FNCEWS40MTOM/";
     String username = "usrvfnadm";
-    String password = "UcSG.241014$";
-    String objectStoreName = "UCSG-1";
+    String password = "adminfn654";
+    String objectStoreName = "UCSG-DEV";
 
     Connection conn = Factory.Connection.getConnection(uri);
     Subject subject = UserContext.createSubject(conn, username, password, null);
@@ -27,7 +29,7 @@ public class PropertyMetadataExplorer {
         null
       );
 
-      String className = "Documento_Test";
+      String className = "resolucionesDoc";
 
       ClassDescription cd = Factory.ClassDescription.fetchInstance(
         os,
@@ -56,6 +58,22 @@ public class PropertyMetadataExplorer {
           ) {
             TypeID type = pd.get_DataType();
             System.out.println(" - " + propName + " (" + type.getValue() + ")");
+
+            // Verificar si tiene ChoiceList asociada
+            ChoiceList choiceList = pd.get_ChoiceList();
+
+            if (choiceList != null) {
+              System.out.println("   Valores permitidos:");
+              for (Object choiceObj : choiceList.get_ChoiceValues()) {
+                Choice choice = (Choice) choiceObj;
+                System.out.println(
+                  "    * " +
+                  choice.get_DisplayName() +
+                  " = " +
+                  choice.get_ChoiceStringValue()
+                );
+              }
+            }
           }
         }
       }
