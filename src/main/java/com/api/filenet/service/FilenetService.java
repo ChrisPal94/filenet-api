@@ -812,7 +812,9 @@ public class FilenetService {
   public List<Map<String, Object>> buscarDocumentos(
     String nombreDocumento,
     String fechaDocumento,
-    String enteRegulatorio
+    String enteRegulatorio,
+    String anio,
+    String tipoDocumento
   ) throws Exception {
     List<Map<String, Object>> resultados = new ArrayList<>();
 
@@ -835,7 +837,7 @@ public class FilenetService {
 
       // Construir query
       StringBuilder query = new StringBuilder(
-        "SELECT d.DocumentTitle, d.FechaDocumento, d.Nombre, d.EnteRegulatorio, d.Id, d.Anio " +
+        "SELECT d.DocumentTitle, d.FechaDocumento, d.Nombre, d.EnteRegulatorio, d.Id, d.Anio, d.TipodeDocumentoResolucion " +
         "FROM resolucionesDoc d WHERE 1=1"
       );
 
@@ -857,6 +859,15 @@ public class FilenetService {
           .append(enteRegulatorio)
           .append("%'");
       }
+      if (anio != null && !anio.isEmpty()) {
+        query.append(" AND d.Anio LIKE '%").append(anio).append("%'");
+      }
+      if (tipoDocumento != null && !tipoDocumento.isEmpty()) {
+        query
+          .append(" AND d.TipodeDocumentoResolucion LIKE '%")
+          .append(tipoDocumento)
+          .append("%'");
+      }
 
       SearchSQL sql = new SearchSQL(query.toString());
       SearchScope scope = new SearchScope(os);
@@ -868,27 +879,6 @@ public class FilenetService {
         Boolean.valueOf(true)
       );
       Iterator<?> it = rowSet.iterator();
-
-      /* while (it.hasNext()) {
-        RepositoryRow row = (RepositoryRow) it.next();
-        Map<String, Object> doc = new HashMap<>();
-        doc.put(
-          "DocumentTitle",
-          row.getProperties().getStringValue("DocumentTitle")
-        );
-        doc.put(
-          "FechaDocumento",
-          row.getProperties().getDateTimeValue("FechaDocumento")
-        );
-        doc.put("Nombre", row.getProperties().getStringValue("Nombre"));
-        doc.put(
-          "EnteRegulatorio",
-          row.getProperties().getStringValue("EnteRegulatorio")
-        );
-        doc.put("Anio", row.getProperties().getStringValue("Anio"));
-        doc.put("Id", row.getProperties().getIdValue("Id").toString());
-        resultados.add(doc);
-      } */
 
       while (it.hasNext()) {
         RepositoryRow row = (RepositoryRow) it.next();
@@ -908,6 +898,10 @@ public class FilenetService {
           row.getProperties().getStringValue("EnteRegulatorio")
         );
         doc.put("Anio", row.getProperties().getStringValue("Anio"));
+        doc.put(
+          "TipoDocumento",
+          row.getProperties().getStringValue("TipodeDocumentoResolucion")
+        );
         String id = row.getProperties().getIdValue("Id").toString();
         doc.put("Id", id);
 

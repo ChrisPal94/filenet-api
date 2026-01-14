@@ -206,13 +206,17 @@ public class FilenetController {
     public ResponseEntity<?> buscarDocumentos(
       @RequestParam(required = false) String nombreDocumento,
       @RequestParam(required = false) String fechaDocumento,
-      @RequestParam(required = false) String enteRegulatorio
+      @RequestParam(required = false) String enteRegulatorio,
+      @RequestParam(required = false) String anio,
+      @RequestParam(required = false) String tipoDocumento
     ) {
       try {
         List<Map<String, Object>> resultados = filenetService.buscarDocumentos(
           nombreDocumento,
           fechaDocumento,
-          enteRegulatorio
+          enteRegulatorio,
+          anio,
+          tipoDocumento
         );
         return ResponseEntity.ok(resultados);
       } catch (Exception e) {
